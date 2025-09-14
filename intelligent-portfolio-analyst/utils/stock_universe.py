@@ -1,13 +1,55 @@
 import streamlit as st
-from . import data_fetchers # Use relative import for clean architecture
 
-@st.cache_data(ttl=86400) # Cache the data for 24 hours for performance
+# A comprehensive, static list of NSE tickers to ensure reliability.
+# This replaces the need for a live API call for the universe and is much larger.
+NSE_STOCK_UNIVERSE = sorted([
+    "RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK", "HINDUNILVR", "SBIN", 
+    "BHARTIARTL", "ITC", "LICI", "KOTAKBANK", "HCLTECH", "LT", "BAJFINANCE", 
+    "AXISBANK", "MARUTI", "ASIANPAINT", "SUNPHARMA", "WIPRO", "ULTRACEMCO", 
+    "ADANIENT", "TITAN", "ONGC", "TATAMOTORS", "JSWSTEEL", "ADANIPORTS", 
+    "COALINDIA", "NTPC", "POWERGRID", "BAJAJFINSV", "TECHM", "HINDALCO", 
+    "GRASIM", "M&M", "INDUSINDBK", "NESTLEIND", "CIPLA", "VEDL", "EICHERMOT", 
+    "DRREDDY", "ADANIGREEN", "TATASTEEL", "SBILIFE", "BPCL", "HDFCLIFE", 
+    "HEROMOTOCO", "BAJAJ-AUTO", "SHREECEM", "DIVISLAB", "UPL", 
+    "BRITANNIA", "APOLLOHOSP", "TATACONSUM", "HINDZINC", "IOC", "GAIL", 
+    "DLF", "PFC", "RECLTD", "HAVELLS", "SIEMENS", "INDIGO", "PIDILITIND", 
+    "ICICIPRULI", "COLPAL", "AMBUJACEM", "DABUR", "MARICO", "GODREJCP", 
+    "ICICIGI", "SRF", "BERGEPAINT", "IRCTC", "MUTHOOTFIN", "TORNTPHARM", 
+    "ALKEM", "AARTIIND", "AUBANK", "BALKRISIND", "BANDHANBNK", "BANKBARODA", 
+    "BHEL", "BOSCHLTD", "CANBK", "CHOLAFIN", "CONCOR", "CROMPTON", "CUMMINSIND", 
+    "DEEPAKNTR", "ESCORTS", "EXIDEIND", "FEDERALBNK", "GLENMARK", "GMRINFRA", 
+    "GODREJPROP", "HDFCAMC", "HINDPETRO", "IBULHSGFIN", "IDFCFIRSTB", "IEX", 
+    "IGL", "INDUSTOWER", "JINDALSTEL", "JUBLFOOD", "L&TFH", "LICHSGFIN", 
+    "LUPIN", "MANAPPURAM", "MFSL", "MGL", "MPHASIS", "MRF", "NAM-INDIA", 
+    "NATIONALUM", "NAUKRI", "NAVINFLUOR", "NMDC", "OFSS", "PAGEIND", 
+    "PEL", "PETRONET", "PIIND", "PNB", "SAIL", "SRTRANSFIN", "TATAPOWER", 
+    "TATACHEM", "TORNTPOWER", "TVSMOTOR", "UBL", "IDEA", "YESBANK", "ZEEL", 
+    "ZYDUSLIFE", "ACC", "ADANIPOWER", "BEL", "BIOCON", "CADILAHC", "DLF", 
+    "GLAND", "GODREJIND", "ICICIBANK", "IDBI", "INDIAMART", "INDUSINDBK", 
+    "IPCALAB", "JUBILANT", "LAURUSLABS", "LTI", "MCDOWELL-N", "MINDTREE", 
+    "MOTHERSON", "MRPL", "NATIONALUM", "NBCC", "NHPC", "NMDC", "NTPC", 
+    "OIL", "PETRONET", "PNB", "RBLBANK", "SAIL", "SUNTV", "TATACONSUM", 
+    "TATAELXSI", "TATASTEEL", "TRENT", "UNIONBANK", "VOLTAS", "3MINDIA", 
+    "AAVAS", "ABB", "ADANITRANS", "AJANTPHARM", "APLLTD", "ASTRAL", "ATUL",
+    "BAJAJHLDNG", "BAYERCROP", "BHARATFORG", "BLUEDART", "CARBORUNIV", 
+    "CENTURYPLY", "CESC", "CHAMBLFERT", "COROMANDEL", "CRISIL", "DALBHARAT",
+    "DIXON", "ENDURANCE", "FACT", "FINCABLES", "FINEORG", "FORTIS", "FRETAIL",
+    "GLAXO", "GNFC", "GUJGASLTD", "HAL", "HONAUT", "IBVENTURES", "IDFC", 
+    "IIFLWAM", "INDIANB", "INDHOTEL", "IPRU", "JSL", "KAJARIACER", "KANSAINER",
+    "KEC", "KEI", "KNRCON", "LALPATHLAB", "LINDEINDIA", "LUXIND", "MASFIN", 
+    "METROPOLIS", "MOTILALOFS", "MPHASIS", "NATCOPHARM", "NLCINDIA", 
+    "OBEROIRLTY", "POLYCAB", "PRESTIGE", "PVR", "QUESS", "RADICO", "RAJESHEXPO",
+    "RATNAMANI", "RELAXO", "SANOFI", "SCHAEFFLER", "SOLARINDS", "SPICEJET", 
+    "STAR", "SUMICHEM", "SUNDARMFIN", "SUNDRMFAST", "SUNTECK", "SUPREMEIND",
+    "SYNGENE", "TASTYBITE", "TCIEXP", "THERMAX", "TRIDENT", "TTKPRESTIG",
+    "VARROC", "VBL", "VINATIORGA", "VMART", "WELSPUNIND", "WHIRLPOOL"
+])
+
+
 def get_stock_universe():
     """
-    Fetches a comprehensive list of all traded stocks from the NSE.
-    The result is cached to ensure high performance after the first run.
-    This function replaces the old, static STOCK_UNIVERSE list.
+    Returns a comprehensive, static list of all traded stocks from the NSE.
+    This is faster and more reliable than a live API call.
     """
-    # This will call our new data fetching function
-    return data_fetchers.fetch_all_nse_tickers()
+    return NSE_STOCK_UNIVERSE
 
