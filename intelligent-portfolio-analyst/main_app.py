@@ -135,7 +135,6 @@ def display_stock_deep_dive(data):
                 "Market Cap": fundamentals.get("Market Cap", "N/A"),
             }
             lynch_df = pd.DataFrame(lynch_metrics.items(), columns=["Metric", "Value"])
-            # --- CRITICAL FIX: Convert all columns to strings before display ---
             for col in lynch_df.columns:
                 lynch_df[col] = lynch_df[col].astype(str)
             st.dataframe(lynch_df, hide_index=True)
@@ -147,7 +146,6 @@ def display_stock_deep_dive(data):
                 other_fundamentals = {k: v for k, v in fundamentals.items() if k not in lynch_metrics and k != 'sector'}
                 if other_fundamentals:
                     other_df = pd.DataFrame(other_fundamentals.items(), columns=['Metric', 'Value'])
-                    # --- CRITICAL FIX: Convert all columns to strings before display ---
                     for col in other_df.columns:
                         other_df[col] = other_df[col].astype(str)
                     st.dataframe(other_df, hide_index=True)
@@ -159,7 +157,6 @@ def display_stock_deep_dive(data):
                 technicals = stock.get('technicals', {})
                 if technicals:
                      df_tech = pd.DataFrame(technicals.items(), columns=['Indicator', 'Value'])
-                     # --- CRITICAL FIX: Convert all columns to strings before display ---
                      for col in df_tech.columns:
                         df_tech[col] = df_tech[col].astype(str)
                      st.dataframe(df_tech, hide_index=True)
@@ -176,16 +173,116 @@ def display_stock_deep_dive(data):
                  st.write("Price history not available.")
 
 def display_news_feed(data):
-    # ... (code remains the same)
-    pass
+    """Displays the Personalized News Feed tab."""
+    st.header("Personalized News Feed")
+    st.write("Recent news (last 2 months) related to your stock holdings, summarized by AI.")
+    
+    all_news = data.get("news", [])
+    if not all_news:
+        st.warning("Could not retrieve news articles at this time.")
+        return
+
+    for news_item in all_news:
+        st.subheader(f"News for {news_item['ticker']}")
+        for article in news_item['articles']:
+            with st.container():
+                st.write(f"**{article.get('title', 'No Title')}**")
+                st.write(f"*{article.get('publisher', 'N/A')} | {article.get('publish_date', 'N/A')}*")
+                st.info(f"**AI Summary:** {article.get('summary', 'Not available.')}")
+                st.link_button("Read Full Article", article.get('link', '#'))
+                st.divider()
 
 def display_what_if_analysis(original_stocks):
-    # ... (code remains the same)
-    pass
+    """Displays the 'What If?' analysis tab for simulating trades."""
+    st.header("What If? Scenario Analysis")
+    st.write("Simulate how adding a new stock would impact your portfolio's key metrics.")
+
+    if not original_stocks:
+        st.warning("Please upload and analyze your portfolio on the Dashboard tab first.")
+        return
+
+    with st.form("what_if_form"):
+        st.subheader("Enter a Hypothetical Trade")
+        ticker = st.text_input("Stock Ticker (e.g., RELIANCE)", "").upper()
+        quantity = st.number_input("Quantity", min_value=1, value=10)
+        purchase_price = st.number_input("Purchase Price (per share)", min_value=0.01, value=100.0)
+        
+        submit_button = st.form_submit_button("Analyze Scenario")
+
+    if submit_button and ticker:
+        with st.spinner(f"Analyzing scenario for {ticker}..."):
+            formatted_ticker = f"{ticker}.NS"
+            price_history = data_fetchers.get_price_history(formatted_ticker, period="1d")
+            
+            if not price_history:
+                st.error(f"Could not retrieve live price data for {ticker}. Please check the ticker symbol.")
+                return
+
+            ltp = price_history[-1]['Close']
+            
+            new_stock = {
+                'ticker': ticker,
+                'quantity': quantity,
+                'average_cost': purchase_price,
+                'invested_value': quantity * purchase_price,
+                'current_value': quantity * ltp,
+                'beta': data_fetchers.get_beta(formatted_ticker),
+                'fundamentals': data_fetchers.get_fundamental_data(formatted_ticker)
+            }
+            
+            hypothetical_portfolio = original_stocks + [new_stock]
+            
+            original_metrics = aggregate_portfolio_metrics(original_stocks)
+            new_metrics = aggregate_portfolio_metrics(hypothetical_portfolio)
+            
+            st.subheader("Scenario Impact Assessment")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown("#### Original Portfolio")
+                st.metric("Current Value", f"Rs.{original_metrics.get('current_value', 0):,.2f}")
+                st.metric("Risk Profile", original_metrics.get('risk_profile', 'N/A'))
+
+            with col2:
+                st.markdown("#### New Portfolio (Simulated)")
+                st.metric("New Current Value", f"Rs.{new_metrics.get('current_value', 0):,.2f}")
+                st.metric("New Risk Profile", new_metrics.get('risk_profile', 'N/A'))
+
+            st.divider()
+            st.subheader("New Sector Allocation")
+            new_sector_allocation = new_metrics.get('sector_allocation', {})
+            if new_sector_allocation:
+                sector_df = pd.DataFrame(new_sector_allocation.items(), columns=['Sector', 'Value'])
+                fig = px.pie(sector_df, names='Sector', values='Value', hole=0.4, title=" ")
+                st.plotly_chart(fig, use_container_width=True)
 
 def display_screener():
-    # ... (code remains the same)
-    pass
+    """Displays the new Personalized Stock Screener tab."""
+    st.header("Personalized Stock Screener")
+    st.write("Find new investment ideas that match your personal style. Provide a list of tickers to screen.")
+
+    with st.form("screener_form"):
+        st.subheader("1. Define Your Universe")
+        ticker_list = st.text_area("Enter a list of stock tickers to screen (comma-separated)", "RELIANCE, TCS, HDFCBANK, INFY, ICICIBANK, HINDUNILVR, ITC, KOTAKBANK")
+        
+        st.subheader("2. Define Your Investment Profile")
+        risk_appetite = st.selectbox("Your Risk Appetite", ["Conservative", "Moderate", "Aggressive"])
+        horizon = st.selectbox("Your Investment Horizon", ["Short-term (1-3 years)", "Long-term (5+ years)"])
+        
+        submit_button = st.form_submit_button("Find Matching Stocks")
+
+    if submit_button and ticker_list:
+        tickers = [ticker.strip().upper() for ticker in ticker_list.split(',')]
+        with st.spinner("Screening stocks against your profile..."):
+            recommendations = run_screener(tickers, risk_appetite, horizon)
+
+        st.subheader("Screener Results")
+        if recommendations:
+            st.write(f"Found {len(recommendations)} stocks that match your criteria:")
+            rec_df = pd.DataFrame(recommendations)
+            st.dataframe(rec_df, hide_index=True)
+        else:
+            st.success("No stocks in your list matched your specific investment criteria.")
 
 
 # --- MAIN APPLICATION LOGIC ---
