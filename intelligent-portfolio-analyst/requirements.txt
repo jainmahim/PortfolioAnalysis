@@ -1,0 +1,9 @@
+streamlit
+pandas
+plotly
+python-dotenv
+langgraph
+langchain-groq
+yfinance
+pdfplumber
+openpyxl
