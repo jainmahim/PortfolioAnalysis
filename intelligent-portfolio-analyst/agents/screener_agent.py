@@ -14,7 +14,6 @@ def analyze_screener_stock(ticker, risk_appetite, horizon):
     """
     try:
         # 1. Fetch Key Data
-        # The user provides the raw ticker, so we add the .NS suffix here
         formatted_ticker = f"{ticker.strip().upper()}.NS"
         beta = data_fetchers.get_beta(formatted_ticker)
         fundamentals = data_fetchers.get_fundamental_data(formatted_ticker)
@@ -28,7 +27,6 @@ def analyze_screener_stock(ticker, risk_appetite, horizon):
         elif risk_appetite == "Aggressive" and beta > 1.0:
             is_risk_match = True
         
-        # If it doesn't pass the pre-filter, we stop here to save time and resources
         if not is_risk_match:
             return None
 
@@ -66,7 +64,6 @@ def analyze_screener_stock(ticker, risk_appetite, horizon):
         return None
 
     except Exception:
-        # If any error occurs during analysis, we simply skip this stock
         return None
 
 
@@ -79,14 +76,13 @@ def run_screener(tickers, risk_appetite, horizon):
     recommendations = []
     
     with ThreadPoolExecutor(max_workers=10) as executor:
-        # Create a future for each ticker analysis
         future_to_ticker = {executor.submit(analyze_screener_stock, ticker, risk_appetite, horizon): ticker for ticker in tickers}
         
-        # Process results as they complete
         for future in as_completed(future_to_ticker):
             result = future.result()
-            if result: # Only add to the list if the analysis returned a match
+            if result:
                 recommendations.append(result)
 
     st.session_state.analysis_logs.append("---STOCK SCREENER COMPLETE---")
     return recommendations
+

@@ -1,6 +1,29 @@
 import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
+import requests
+
+def fetch_all_nse_tickers():
+    """
+    Fetches the complete list of all stock symbols traded on the NSE
+    directly from the official NSE India website for a comprehensive universe.
+    """
+    try:
+        url = "https://www.nseindia.com/api/market-data-pre-open?key=ALL"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        tickers = [item['metadata']['symbol'] for item in data['data']]
+        extra_tickers = ["RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK"]
+        full_list = sorted(list(set(tickers + extra_tickers)))
+        return full_list
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching stock list from NSE: {e}. Returning a default list.")
+        return ["RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK", "HINDUNILVR", "ITC", "KOTAKBANK"]
+
 
 def get_stock_name(ticker):
     """Fetches the long name of a stock from its ticker."""
@@ -54,7 +77,7 @@ def get_fundamental_data(ticker):
 def get_technical_data(ticker):
     """Fetches key technical indicators for a stock."""
     try:
-        data = yf.download(ticker, period="1y", interval="1d", auto_adjust=True)
+        data = yf.download(ticker, period="1y", interval="1d", auto_adjust=True, progress=False)
         if data.empty:
             return {}
             
@@ -81,7 +104,7 @@ def get_technical_data(ticker):
 def get_price_history(ticker, period="5y"):
     """Fetches historical price data for a stock."""
     try:
-        data = yf.download(ticker, period=period, auto_adjust=True)
+        data = yf.download(ticker, period=period, auto_adjust=True, progress=False)
         if data.empty:
             return {}
 

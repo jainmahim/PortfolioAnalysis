@@ -6,6 +6,7 @@ from graph.graph_orchestrator import run_graph
 from agents.screener_agent import run_screener
 from utils.portfolio_aggregator import aggregate_portfolio_metrics
 from utils import data_fetchers
+from utils.stock_universe import get_stock_universe # <-- NEW IMPORT
 import time
 
 # --- UI DISPLAY FUNCTIONS ---
@@ -87,8 +88,8 @@ def display_dashboard(data):
 
 def display_stock_deep_dive(data):
     """
-    Displays the recommendation table and a detailed analysis, now with
-    robust data type conversion to prevent rendering errors.
+    Displays the recommendation table and a detailed analysis, now featuring
+    a dedicated Peter Lynch Scorecard for each stock.
     """
     st.header("AI-Powered Stock Recommendations")
     
@@ -193,45 +194,61 @@ def display_news_feed(data):
                 st.divider()
 
 def display_what_if_analysis(original_stocks):
-    """Displays the 'What If?' analysis tab for simulating trades."""
+    """
+    Displays the 'What If?' analysis tab, now with a dynamic, searchable
+    stock ticker input and live price fetching.
+    """
     st.header("What If? Scenario Analysis")
     st.write("Simulate how adding a new stock would impact your portfolio's key metrics.")
 
     if not original_stocks:
         st.warning("Please upload and analyze your portfolio on the Dashboard tab first.")
         return
+        
+    st.info(st.session_state.universe_status)
 
     with st.form("what_if_form"):
         st.subheader("Enter a Hypothetical Trade")
-        ticker = st.text_input("Stock Ticker (e.g., RELIANCE)", "").upper()
-        quantity = st.number_input("Quantity", min_value=1, value=10)
-        purchase_price = st.number_input("Purchase Price (per share)", min_value=0.01, value=100.0)
+        
+        # Use a searchable selectbox for a better user experience
+        ticker = st.selectbox(
+            "Search for a Stock Ticker (start typing to filter)", 
+            options=st.session_state.stock_universe
+        )
+        
+        # Use columns for a cleaner layout
+        col1, col2 = st.columns(2)
+        with col1:
+            quantity = st.number_input("Quantity", min_value=1, value=10)
+        with col2:
+            # Price is now dynamically fetched and displayed
+            ltp = 0
+            if ticker:
+                price_history = data_fetchers.get_price_history(f"{ticker}.NS", period="1d")
+                if price_history:
+                    ltp = price_history[-1]['Close']
+            purchase_price = st.number_input(
+                "Purchase Price (automatically fetched, editable)", 
+                min_value=0.01, 
+                value=float(ltp),
+                key="what_if_price"
+            )
         
         submit_button = st.form_submit_button("Analyze Scenario")
 
     if submit_button and ticker:
         with st.spinner(f"Analyzing scenario for {ticker}..."):
-            formatted_ticker = f"{ticker}.NS"
-            price_history = data_fetchers.get_price_history(formatted_ticker, period="1d")
-            
-            if not price_history:
-                st.error(f"Could not retrieve live price data for {ticker}. Please check the ticker symbol.")
-                return
-
-            ltp = price_history[-1]['Close']
+            # The purchase price is the one from the form
+            final_purchase_price = st.session_state.what_if_price
             
             new_stock = {
-                'ticker': ticker,
-                'quantity': quantity,
-                'average_cost': purchase_price,
-                'invested_value': quantity * purchase_price,
-                'current_value': quantity * ltp,
-                'beta': data_fetchers.get_beta(formatted_ticker),
-                'fundamentals': data_fetchers.get_fundamental_data(formatted_ticker)
+                'ticker': ticker, 'quantity': quantity, 'average_cost': final_purchase_price,
+                'invested_value': quantity * final_purchase_price, 'current_value': quantity * final_purchase_price, # Starts at purchase price
+                'beta': data_fetchers.get_beta(f"{ticker}.NS"),
+                'fundamentals': data_fetchers.get_fundamental_data(f"{ticker}.NS")
             }
             
             hypothetical_portfolio = original_stocks + [new_stock]
-            
             original_metrics = aggregate_portfolio_metrics(original_stocks)
             new_metrics = aggregate_portfolio_metrics(hypothetical_portfolio)
             
@@ -242,7 +259,6 @@ def display_what_if_analysis(original_stocks):
                 st.markdown("#### Original Portfolio")
                 st.metric("Current Value", f"Rs.{original_metrics.get('current_value', 0):,.2f}")
                 st.metric("Risk Profile", original_metrics.get('risk_profile', 'N/A'))
-
             with col2:
                 st.markdown("#### New Portfolio (Simulated)")
                 st.metric("New Current Value", f"Rs.{new_metrics.get('current_value', 0):,.2f}")
@@ -257,13 +273,20 @@ def display_what_if_analysis(original_stocks):
                 st.plotly_chart(fig, use_container_width=True)
 
 def display_screener():
-    """Displays the new Personalized Stock Screener tab."""
+    """
+    Displays the Personalized Stock Screener tab, now powered by the
+    dynamic stock universe.
+    """
     st.header("Personalized Stock Screener")
     st.write("Find new investment ideas that match your personal style. Provide a list of tickers to screen.")
+    
+    st.info(st.session_state.universe_status)
+    default_tickers = ", ".join(st.session_state.stock_universe[:8])
 
     with st.form("screener_form"):
         st.subheader("1. Define Your Universe")
-        ticker_list = st.text_area("Enter a list of stock tickers to screen (comma-separated)", "RELIANCE, TCS, HDFCBANK, INFY, ICICIBANK, HINDUNILVR, ITC, KOTAKBANK")
+        st.info("You can find and copy tickers from the searchable list in the 'What If? Analysis' tab.")
+        ticker_list = st.text_area("Enter a list of stock tickers to screen (comma-separated)", default_tickers)
         
         st.subheader("2. Define Your Investment Profile")
         risk_appetite = st.selectbox("Your Risk Appetite", ["Conservative", "Moderate", "Aggressive"])
@@ -291,6 +314,15 @@ def main():
     """Main function to run the Streamlit application."""
     st.set_page_config(layout="wide", page_title="Intelligent Portfolio Analyst")
     load_dotenv()
+
+    # Load the stock universe once at the beginning
+    if 'stock_universe' not in st.session_state:
+        stock_universe = get_stock_universe()
+        if len(stock_universe) > 10:
+            st.session_state.universe_status = f"Loaded {len(stock_universe)} stocks from NSE for suggestions."
+        else:
+            st.session_state.universe_status = "Could not fetch the full list of stocks. Showing a limited sample."
+        st.session_state.stock_universe = stock_universe
 
     st.markdown("""
         <style>
