@@ -22,7 +22,7 @@ def run_detailed_stock_analysis(ticker):
         # 2. AI-Powered Pros and Cons Generation
         llm = ChatGroq(
             model_name="meta-llama/llama-4-scout-17b-16e-instruct",
-            groq_api_key=os.getenv("GROQ_API_KEY"),
+            groq_api_key=st.secrets["GROQ_API_KEY"],
             temperature=0.1
         )
         
@@ -74,4 +74,3 @@ def run_detailed_stock_analysis(ticker):
             "fundamentals": {},
             "pros_cons": {"pros": ["Data fetching failed."], "cons": ["Data fetching failed."]}
         }
-
