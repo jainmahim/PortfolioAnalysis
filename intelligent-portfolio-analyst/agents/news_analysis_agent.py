@@ -28,10 +28,10 @@ def news_analysis_agent(state: Dict[str, Any]) -> Dict[str, Any]:
 
     try:
         # Initialize clients for both primary and fallback sources
-        newsapi = NewsApiClient(api_key=os.getenv("NEWS_API_KEY"))
+        newsapi = NewsApiClient(api_key=st.secrets["NEWS_API_KEY"])
         llm = ChatGroq(
             model_name="meta-llama/llama-4-scout-17b-16e-instruct", 
-            groq_api_key=os.getenv("GROQ_API_KEY"),
+            groq_api_key=st.secrets["GROQ_API_KEY"],
             temperature=0.0
         )
         summary_prompt = ChatPromptTemplate.from_template(
@@ -103,4 +103,3 @@ def news_analysis_agent(state: Dict[str, Any]) -> Dict[str, Any]:
         analysis_errors.append(error_msg)
 
     return {"news": news_results, "analysis_errors": analysis_errors}
-
