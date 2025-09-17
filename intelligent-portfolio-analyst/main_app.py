@@ -13,9 +13,9 @@ from utils.stock_universe import get_stock_universe
 
 def display_dashboard(data):
     """
-    Displays the main dashboard with a cleaner, more readable layout.
+    Displays the main dashboard with the new GenZ-focused design.
     """
-    st.header("Dashboard: 360° View")
+    st.header("📈 Your Portfolio's Vibe Check")
 
     with st.container(border=True):
         total_investment = data.get('total_investment', 0)
@@ -31,32 +31,32 @@ def display_dashboard(data):
         col3.metric("Profit/Loss", f"₹{pnl:,.2f}", f"{pnl_percent:.2f}%" if pnl_percent is not None else "", delta_color=pnl_color)
         col4.metric("Risk Profile", data.get('risk_profile', 'N/A'))
 
-    st.subheader("Portfolio Allocation")
+    st.subheader("📊 Your Asset Mix")
     with st.container(border=True):
         col1, col2 = st.columns(2) 
         with col1:
             st.markdown("<h6>Ideal Sector Allocation</h6>", unsafe_allow_html=True)
             ideal_allocation_data = {
                 'Sector': ['Financials', 'IT', 'Consumer Goods', 'Healthcare', 'Energy', 'Industrials', 'Materials', 'Utilities'],
-                'Value': [25, 15, 15,  10, 10, 10, 5, 10]
+                'Value': [25, 15, 15, 10, 10, 10, 5, 10]
             }
             ideal_df = pd.DataFrame(ideal_allocation_data)
-            fig = px.pie(ideal_df, names='Sector', values='Value', hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel)
+            fig = px.pie(ideal_df, names='Sector', values='Value', hole=0.5, color_discrete_sequence=px.colors.sequential.Turbo)
             fig.update_layout(showlegend=False, margin=dict(l=10, r=10, t=10, b=10), height=300)
             st.plotly_chart(fig, use_container_width=True)
 
         with col2:
-            st.markdown("<h6>Your Sector Allocation</h6>", unsafe_allow_html=True)
+            st.markdown("<h6>Your Current Sector Allocation</h6>", unsafe_allow_html=True)
             sector_allocation = data.get('sector_allocation', {})
             if sector_allocation and sum(sector_allocation.values()) > 0:
                 sector_df = pd.DataFrame(sector_allocation.items(), columns=['Sector', 'Value'])
-                fig = px.pie(sector_df, names='Sector', values='Value', hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel)
+                fig = px.pie(sector_df, names='Sector', values='Value', hole=0.5, color_discrete_sequence=px.colors.sequential.Turbo)
                 fig.update_layout(showlegend=False, margin=dict(l=10, r=10, t=10, b=10), height=300)
                 st.plotly_chart(fig, use_container_width=True)
             else:
                 st.info("No sector allocation data to display.", icon="📊")
     
-    st.subheader("Holdings Summary")
+    st.subheader("📄 Your Holdings")
     with st.container(border=True):
         stocks = data.get('stock_analysis', [])
         if stocks:
@@ -73,9 +73,9 @@ def display_dashboard(data):
 
 def display_stock_deep_dive(data):
     """
-    Displays the recommendation table and a detailed analysis.
+    Displays the recommendation table and a detailed analysis with the new theme.
     """
-    st.header("AI-Powered Stock Recommendations")
+    st.header("🤖 AI Stock Report Card")
     
     stocks = data.get('stock_analysis', [])
     if not stocks:
@@ -104,9 +104,9 @@ def display_stock_deep_dive(data):
             use_container_width=True
         )
 
-    st.subheader("Detailed Stock Analysis")
+    st.subheader("🧪 Deep-Dive Analysis")
     for stock in stocks:
-        with st.expander(f"Explore detailed data for {stock.get('name', 'N/A')}"):
+        with st.expander(f"Explore the tea on {stock.get('name', 'N/A')}"):
             st.subheader(f"{stock.get('name', 'N/A')} ({stock.get('ticker', 'N/A')})")
             
             st.markdown("#### Key Metrics (Peter Lynch Style)")
@@ -148,15 +148,15 @@ def display_stock_deep_dive(data):
                 price_history = stock.get('price_history', {})
                 if price_history:
                     price_df = pd.DataFrame(price_history)
-                    fig = px.line(price_df, x='Date', y='Close', title=f"{stock.get('name')} Price Chart", template="plotly_white")
+                    fig = px.line(price_df, x='Date', y='Close', title=f"{stock.get('name')} Price Chart", template="plotly_white", color_discrete_sequence=['#5E5CE6'])
                     st.plotly_chart(fig, use_container_width=True)
                 else:
                      st.write("Price history not available.")
 
 def display_news_feed(data):
-    """Displays the Personalized News Feed tab."""
-    st.header("Personalized News Feed")
-    st.write("Recent news (last 2 months) related to your stock holdings, summarized by AI.")
+    """Displays the Personalized News Feed tab with the new theme."""
+    st.header("🗞️ Your News Feed, but Cooler")
+    st.write("Catch up on the latest headlines for your stocks, summarized by AI. No cap.")
     
     all_news = data.get("news", [])
     if not all_news:
@@ -177,7 +177,7 @@ def display_what_if_analysis(original_stocks):
     """
     Displays the 'What If?' analysis tab with a polished UI.
     """
-    st.header("What If? Scenario Mode")
+    st.header("🔬 What If? Scenario Mode")
     st.write("See how a new trade could change up your portfolio's stats.")
 
     if not original_stocks:
@@ -225,7 +225,7 @@ def display_what_if_analysis(original_stocks):
                     original_sector_allocation = original_metrics.get('sector_allocation', {})
                     if original_sector_allocation:
                         sector_df_orig = pd.DataFrame(original_sector_allocation.items(), columns=['Sector', 'Value'])
-                        fig_orig = px.pie(sector_df_orig, names='Sector', values='Value', hole=0.5, height=250, color_discrete_sequence=px.colors.sequential.Tealgrn)
+                        fig_orig = px.pie(sector_df_orig, names='Sector', values='Value', hole=0.5, height=250, color_discrete_sequence=px.colors.sequential.Turbo)
                         fig_orig.update_layout(showlegend=False, margin=dict(l=10, r=10, t=10, b=10))
                         st.plotly_chart(fig_orig, use_container_width=True)
                 with col2:
@@ -233,7 +233,7 @@ def display_what_if_analysis(original_stocks):
                     new_sector_allocation = new_metrics.get('sector_allocation', {})
                     if new_sector_allocation:
                         sector_df_new = pd.DataFrame(new_sector_allocation.items(), columns=['Sector', 'Value'])
-                        fig_new = px.pie(sector_df_new, names='Sector', values='Value', hole=0.5, height=250, color_discrete_sequence=px.colors.sequential.Tealgrn)
+                        fig_new = px.pie(sector_df_new, names='Sector', values='Value', hole=0.5, height=250, color_discrete_sequence=px.colors.sequential.Turbo)
                         fig_new.update_layout(showlegend=False, margin=dict(l=10, r=10, t=10, b=10))
                         st.plotly_chart(fig_new, use_container_width=True)
                 
@@ -249,15 +249,18 @@ def display_what_if_analysis(original_stocks):
 
 def display_screener():
     """ Displays the completely revamped Detailed Stock Analysis tab. """
-    st.header("Detailed Stock Analysis")
-    st.write("Search for any stock to get a detailed breakdown, AI-powered insights, and comparative analysis.")
+    st.header("🔍 Get the Lowdown on Any Stock")
+    st.write("Your personal stock research assistant. Let's dig in.")
 
     with st.form("stock_selection_form"):
         col1, col2 = st.columns([3, 1])
         with col1:
             selected_ticker = st.selectbox("Search for a Stock Ticker", options=st.session_state.stock_universe, index=None, placeholder="Type to search for a stock...", key="screener_stock_select")
         with col2:
+            st.markdown("<div class='align-button'>", unsafe_allow_html=True)
             analyze_button = st.form_submit_button("Analyze", use_container_width=True, type="primary")
+            st.markdown("</div>", unsafe_allow_html=True)
+
 
     if analyze_button and selected_ticker:
         with st.spinner(f"Getting the details for {selected_ticker}..."):
@@ -275,7 +278,7 @@ def display_screener():
 
         with st.container(border=True):
             cols = st.columns(3)
-            metrics_to_show = [("Market Cap", "Market Cap"), ("Current Price", "Current Price"), ("High / Low", "High / Low"), ("Stock P/E", "P/E Ratio"), ("Book Value", "Book Value"), ("Dividend Yield", "Dividend Yield"), ("ROCE", "ROCE"), ("ROE", "ROE"), ("Face Value", "Face Value")]
+            metrics_to_show = [("Market Cap", "Market Cap"), ("Current Price", "Current Price"), ("High / Low", "High / Low"), ("Stock P/E", "P/E Ratio"), ("Book Value", "Book Value"), ("Dividend Yield", "Dividend Yield"), ("ROE", "ROE")]
             for i, (label, key) in enumerate(metrics_to_show):
                 value = fundamentals.get(key, 'N/A')
                 with cols[i % 3]:
@@ -295,11 +298,11 @@ def display_screener():
             if price_history:
                 price_df = pd.DataFrame(price_history)
                 fig = go.Figure()
-                fig.add_trace(go.Scatter(x=price_df['Date'], y=price_df['Close'], mode='lines', name='Price', line=dict(color='#007BFF'))) 
+                fig.add_trace(go.Scatter(x=price_df['Date'], y=price_df['Close'], mode='lines', name='Price', line=dict(color='#5E5CE6'))) 
                 if show_50ma and '50-Day MA' in price_df.columns:
-                    fig.add_trace(go.Scatter(x=price_df['Date'], y=price_df['50-Day MA'], mode='lines', name='50-Day MA', line=dict(color='#FFA500', dash='dash'))) 
+                    fig.add_trace(go.Scatter(x=price_df['Date'], y=price_df['50-Day MA'], mode='lines', name='50-Day MA', line=dict(color='#00C7B1', dash='dash'))) 
                 if show_200ma and '200-Day MA' in price_df.columns:
-                    fig.add_trace(go.Scatter(x=price_df['Date'], y=price_df['200-Day MA'], mode='lines', name='200-Day MA', line=dict(color='#FF4500', dash='dash'))) 
+                    fig.add_trace(go.Scatter(x=price_df['Date'], y=price_df['200-Day MA'], mode='lines', name='200-Day MA', line=dict(color='#FF2D55', dash='dash'))) 
                 fig.update_layout(title=f"{stock_name} Price Chart ({selected_timeframe})", yaxis_title="Price (₹)", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), template="plotly_white")
                 st.plotly_chart(fig, use_container_width=True)
             else:
@@ -310,12 +313,12 @@ def display_screener():
         col1, col2 = st.columns(2)
         with col1:
             with st.container(border=True):
-                st.markdown("<h5><span style='color: #28a745;'>Pros</span></h5>", unsafe_allow_html=True)
+                st.markdown("<h5><span style='color: #34C759;'>Pros</span></h5>", unsafe_allow_html=True)
                 for pro in pros_cons.get('pros', ["Analysis not available."]):
                     st.markdown(f"- {pro}")
         with col2:
             with st.container(border=True):
-                st.markdown("<h5><span style='color: #dc3545;'>Cons</span></h5>", unsafe_allow_html=True)
+                st.markdown("<h5><span style='color: #FF3B30;'>Cons</span></h5>", unsafe_allow_html=True)
                 for con in pros_cons.get('cons', ["Analysis not available."]):
                     st.markdown(f"- {con}")
         
@@ -329,7 +332,9 @@ def display_screener():
                     with col1:
                         compare_ticker = st.selectbox("Add a stock to compare (max 3)", options=[s for s in st.session_state.stock_universe if s != st.session_state.get('selected_screener_ticker')], index=None, placeholder="Search for a stock...")
                     with col2:
+                        st.markdown("<div class='align-button'>", unsafe_allow_html=True)
                         add_compare_button = st.form_submit_button("Add", type="primary", use_container_width=True)
+                        st.markdown("</div>", unsafe_allow_html=True)
 
                     if add_compare_button and compare_ticker and compare_ticker not in st.session_state.comparison_stocks:
                         st.session_state.comparison_stocks.append(compare_ticker)
@@ -364,50 +369,50 @@ def display_screener():
 
 def main():
     """Main function to run the Streamlit application."""
-    st.set_page_config(layout="wide", page_title="Intelligent Portfolio Analyst")
+    st.set_page_config(layout="wide", page_title="AlphaBot")
     load_dotenv()
 
     # Initialize session state keys
-    if 'active_tab_index' not in st.session_state:
-        st.session_state.active_tab_index = 0
     if 'stock_universe' not in st.session_state:
         st.session_state.stock_universe = get_stock_universe()
         
     st.markdown("""
         <style>
-            @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
-            
-            html, body, [class*="st-"] {
-                font-family: 'Poppins', sans-serif;
-            }
             .main { background-color: #F8F9FA; }
             h1 {
                 font-weight: 700;
                 color: #212529;
             }
-            h2, h3 { color: #343A40; font-weight: 600; }
+            h2, h3 { color: #2C2C2E; font-weight: 600; }
             h6 { color: #6C757D; }
             [data-testid="stVerticalBlock"] > [data-testid="stVerticalBlock"] > [data-testid="stVerticalBlock"] {
-                border: 1px solid #E9ECEF;
+                border: none;
                 border-radius: 1rem;
                 padding: 1.5rem;
                 background-color: #FFFFFF;
-                box-shadow: 0 8px 16px rgba(0,0,0,0.04);
+                box-shadow: 0 8px 24px rgba(0,0,0,0.05);
+                transition: box-shadow 0.3s ease-in-out;
             }
-            [data-testid="stMetricValue"] { font-size: 2rem; color: #212529; font-weight: 600; }
-            [data-testid="stMetricLabel"] { font-size: 0.9rem; color: #6C757D; }
-            .stTabs [data-baseweb="tab-list"] { gap: 8px; border-bottom: 1px solid #DEE2E6; }
-            .stTabs [data-baseweb="tab"] { height: 50px; background-color: transparent; padding: 0 1.5rem; border: 1px solid transparent; border-radius: 0.5rem 0.5rem 0 0; margin-bottom: -1px; color: #495057; transition: all 0.2s; }
-            .stTabs [data-baseweb="tab"]:hover { background-color: #F1F3F5; color: #000; }
-            .stTabs [aria-selected="true"] { background-color: #FFFFFF; border-color: #DEE2E6 #DEE2E6 #FFFFFF; color: #007BFF; font-weight: 600; }
-            .stButton > button, .stDownloadButton > button { border: 2px solid #007BFF; border-radius: 0.75rem; color: #007BFF; background-color: #FFFFFF; font-weight: 600; padding: 0.5rem 1.25rem; transition: all 0.2s; }
-            .stButton > button:hover, .stDownloadButton > button:hover { background-color: #007BFF; color: #FFFFFF; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,123,255,0.2); }
-            .stForm .stButton > button { background-color: #007BFF; color: #FFFFFF; }
-            .stForm .stButton > button:hover { background-color: #0056b3; border-color: #0056b3; }
+            [data-testid="stVerticalBlock"] > [data-testid="stVerticalBlock"] > [data-testid="stVerticalBlock"]:hover {
+                 box-shadow: 0 12px 32px rgba(0,0,0,0.08);
+            }
+            [data-testid="stMetricValue"] { font-size: 2rem; color: #1D1D1F; font-weight: 600; }
+            [data-testid="stMetricLabel"] { font-size: 0.9rem; color: #8A8A8E; }
+            .stTabs [data-baseweb="tab-list"] { gap: 12px; border-bottom: 2px solid #EAEAEA; }
+            .stTabs [data-baseweb="tab"] { height: 50px; background-color: transparent; padding: 0 1.5rem; border: none; color: #636366; transition: all 0.2s; }
+            .stTabs [data-baseweb="tab"]:hover { background-color: #F2F2F7; color: #5E5CE6; border-radius: 0.5rem 0.5rem 0 0; }
+            .stTabs [aria-selected="true"] { color: #5E5CE6; font-weight: 600; }
+            .stButton > button, .stDownloadButton > button { border: 2px solid #5E5CE6; border-radius: 0.75rem; color: #5E5CE6; background-color: #FFFFFF; font-weight: 600; padding: 0.5rem 1.25rem; transition: all 0.2s; }
+            .stButton > button:hover, .stDownloadButton > button:hover { background-color: #5E5CE6; color: #FFFFFF; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(94,92,230,0.3); }
+            .stForm .stButton > button { background-color: #5E5CE6; color: #FFFFFF; }
+            .stForm .stButton > button:hover { background-color: #4B4AC4; border-color: #4B4AC4; }
+            .align-button {
+                padding-top: 28px;
+            }
         </style>
     """, unsafe_allow_html=True)
 
-    st.title("Intelligent Portfolio Analyst ©")
+    st.title("AlphaBot 🤖")
 
     if 'analysis_logs' not in st.session_state:
         st.session_state.analysis_logs = []
@@ -420,9 +425,10 @@ def main():
     if 'final_report' not in st.session_state:
         st.session_state.final_report = None
         
-    if uploaded_file:
+    if uploaded_file and not st.session_state.get('analysis_triggered'):
         st.session_state.analysis_logs = []
         st.session_state.final_report = None
+        st.session_state.analysis_triggered = True 
         
         status_map = {
             "ingest_portfolio": "Reading your portfolio file...",
@@ -440,35 +446,39 @@ def main():
                 if "report_generator" in chunk:
                     st.session_state.final_report = chunk["report_generator"].get("final_report")
             status.update(label="Analysis Complete! Your report is ready.", state="complete", expanded=False)
+    
+    if not uploaded_file:
+        st.session_state.analysis_triggered = False
+
 
     tab_names = ["Dashboard", "Stock Deep-Dive", "Personalized News", "What If? Analysis", "Detailed Stock Analysis"]
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(tab_names)
+    tabs = st.tabs(tab_names)
 
-    with tab1:
+    with tabs[0]:
         if st.session_state.get('final_report'):
             display_dashboard(st.session_state.final_report)
         else:
             st.info("Upload your portfolio using the sidebar to see your Dashboard.", icon="📊")
 
-    with tab2:
+    with tabs[1]:
         if st.session_state.get('final_report'):
             display_stock_deep_dive(st.session_state.final_report)
         else:
             st.info("Upload your portfolio to get your AI Stock Report Card.", icon="💡")
 
-    with tab3:
+    with tabs[2]:
         if st.session_state.get('final_report'):
             display_news_feed(st.session_state.final_report)
         else:
             st.info("Upload your portfolio to see your personalized news feed.", icon="📰")
     
-    with tab4:
+    with tabs[3]:
         if st.session_state.get('final_report'):
             display_what_if_analysis(st.session_state.final_report.get('stock_analysis', []))
         else:
             st.info("Upload your portfolio to use the What If? Scenario Mode.", icon="🔬")
 
-    with tab5:
+    with tabs[4]:
         display_screener()
     
     st.divider()
@@ -487,7 +497,7 @@ def main():
             """)
         with col2:
             st.subheader("Analysis Logs")
-            log_text = "\n".join(st.session_state.analysis_logs)
+            log_text = "\n".join(st.session_state.get('analysis_logs', []))
             st.text_area("Logs", log_text, height=150, key="footer_logs")
 
     st.warning("""**Disclaimer:** Investment in securities market are subject to market risks. Read all related documents carefully before investing. This is AI-generated content for educational purposes only. AI can make mistakes. All financial data is provided by yfinance.""", icon="⚠️")

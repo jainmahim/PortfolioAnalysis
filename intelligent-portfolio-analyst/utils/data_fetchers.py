@@ -1,13 +1,8 @@
-import streamlit as st
 import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
-from typing import Dict, Any, List
 
-# --- Caching ensures we don't re-fetch the same data repeatedly ---
-
-@st.cache_data(ttl=3600)  # Cache for 1 hour
-def get_stock_name(ticker: str) -> str:
+def get_stock_name(ticker):
     """Fetches the long name of a stock from its ticker."""
     try:
         stock = yf.Ticker(ticker)
@@ -15,9 +10,8 @@ def get_stock_name(ticker: str) -> str:
     except Exception:
         return ticker
 
-@st.cache_data(ttl=3600)
-def get_beta(ticker: str) -> float:
-    """Fetches the beta of a stock, defaulting to 1.0 on failure."""
+def get_beta(ticker):
+    """Fetches the beta of a stock."""
     try:
         stock = yf.Ticker(ticker)
         beta = stock.info.get('beta')
@@ -25,39 +19,65 @@ def get_beta(ticker: str) -> float:
     except Exception:
         return 1.0
 
-@st.cache_data(ttl=900) # Cache fundamental data for 15 minutes
-def get_fundamental_data(ticker: str) -> Dict[str, Any]:
+def get_fundamental_data(ticker):
     """
-    Fetches an expanded set of raw fundamental data for a stock.
-    Formatting is handled by the UI layer.
+    Fetches an expanded set of fundamental data, including the new
+    metrics required for the Peter Lynch analysis and the new screener.
     """
     try:
         stock = yf.Ticker(ticker)
         info = stock.info
         
+        # Fetch raw values safely using .get()
+        pe_ratio = info.get('trailingPE')
+        eps = info.get('trailingEps')
+        pb_ratio = info.get('priceToBook')
+        debt_to_equity = info.get('debtToEquity')
+        market_cap = info.get('marketCap')
+        sector = info.get('sector')
+        forward_pe = info.get('forwardPE')
+        peg_ratio = info.get('pegRatio')
+        current_price = info.get('regularMarketPrice') or info.get('currentPrice')
+        fifty_two_week_high = info.get('fiftyTwoWeekHigh')
+        fifty_two_week_low = info.get('fiftyTwoWeekLow')
+        book_value = info.get('bookValue')
+        dividend_yield = info.get('dividendYield')
+        roe = info.get('returnOnEquity')
+
+        # Safely perform calculations only if the source value is not None
+        debt_to_equity_val = (debt_to_equity / 100) if debt_to_equity is not None else None
+        dividend_yield_val = (dividend_yield * 100) if dividend_yield is not None else None
+        roe_val = (roe * 100) if roe is not None else None
+
+        # Return the formatted dictionary, checking each value before formatting
         return {
-            "P/E Ratio": info.get('trailingPE'),
-            "Forward P/E Ratio": info.get('forwardPE'),
-            "PEG Ratio": info.get('pegRatio'),
-            "EPS": info.get('trailingEps'),
-            "Price-to-Book": info.get('priceToBook'),
-            "Debt-to-Equity": info.get('debtToEquity'),
-            "Market Cap": info.get('marketCap'),
-            "sector": info.get('sector'),
-            "Current Price": info.get('regularMarketPrice') or info.get('currentPrice'),
-            "High / Low": (info.get('fiftyTwoWeekHigh'), info.get('fiftyTwoWeekLow')),
-            "Book Value": info.get('bookValue'),
-            "Dividend Yield": info.get('dividendYield'),
-            "ROE": info.get('returnOnEquity'),
-            "ROCE": info.get('returnOnAssets'), # Using ROA as a proxy for ROCE
-            "Face Value": info.get('faceValue')
+            "P/E Ratio": f"{pe_ratio:.2f}" if pe_ratio is not None else 'N/A',
+            "Forward P/E Ratio": f"{forward_pe:.2f}" if forward_pe is not None else 'N/A',
+            "PEG Ratio": f"{peg_ratio:.2f}" if peg_ratio is not None else 'N/A',
+            "EPS": f"{eps:.2f}" if eps is not None else 'N/A',
+            "Price-to-Book": f"{pb_ratio:.2f}" if pb_ratio is not None else 'N/A',
+            "Debt-to-Equity": f"{debt_to_equity_val:.2f}" if debt_to_equity_val is not None else 'N/A',
+            "Market Cap": f"Rs.{market_cap:,.0f}" if market_cap is not None else 'N/A',
+            "sector": sector or 'N/A',
+            
+            "Current Price": f"Rs.{current_price:,.2f}" if current_price is not None else 'N/A',
+            "High / Low": f"Rs.{fifty_two_week_high:,.2f} / Rs.{fifty_two_week_low:,.2f}" if fifty_two_week_high is not None and fifty_two_week_low is not None else 'N/A',
+            "Book Value": f"Rs.{book_value:,.2f}" if book_value is not None else 'N/A',
+            "Dividend Yield": f"{dividend_yield_val:.2f}%" if dividend_yield_val is not None else 'N/A',
+            "ROE": f"{roe_val:.2f}%" if roe_val is not None else 'N/A'
         }
     except Exception:
-        return {}
+        # Fallback in case of a major yfinance error
+        return {
+            "P/E Ratio": 'N/A', "Forward P/E Ratio": 'N/A', "PEG Ratio": 'N/A',
+            "EPS": 'N/A', "Price-to-Book": 'N/A', "Debt-to-Equity": 'N/A',
+            "Market Cap": 'N/A', "sector": 'N/A', "Current Price": 'N/A',
+            "High / Low": 'N/A', "Book Value": 'N/A', "Dividend Yield": 'N/A',
+            "ROE": 'N/A'
+        }
 
-@st.cache_data(ttl=900) # Cache technical data for 15 minutes
-def get_technical_data(ticker: str) -> Dict[str, Any]:
-    """Fetches key raw technical indicators for a stock."""
+def get_technical_data(ticker):
+    """Fetches key technical indicators for a stock."""
     try:
         data = yf.download(ticker, period="1y", interval="1d", auto_adjust=True, progress=False)
         if data.empty:
@@ -76,20 +96,19 @@ def get_technical_data(ticker: str) -> Dict[str, Any]:
         rsi = 100 - (100 / (1 + rs)).iloc[-1]
 
         return {
-            "50-Day MA": fifty_day_ma,
-            "200-Day MA": two_hundred_day_ma,
-            "RSI (14)": rsi
+            "50-Day MA": f"Rs.{fifty_day_ma:,.2f}",
+            "200-Day MA": f"Rs.{two_hundred_day_ma:,.2f}",
+            "RSI (14)": f"{rsi:.2f}"
         }
     except Exception:
         return {}
 
-@st.cache_data(ttl=900) # Cache price history for 15 minutes
-def get_price_history(ticker: str, period: str = "5y", interval: str = "1d") -> List[Dict[str, Any]]:
-    """Fetches historical price data for a stock and calculates MAs."""
+def get_price_history(ticker, period="5y", interval="1d"):
+    """Fetches historical price data for a stock."""
     try:
         data = yf.download(ticker, period=period, interval=interval, auto_adjust=True, progress=False)
         if data.empty:
-            return []
+            return {}
 
         if isinstance(data.columns, pd.MultiIndex):
             data.columns = data.columns.droplevel(1)
@@ -103,10 +122,9 @@ def get_price_history(ticker: str, period: str = "5y", interval: str = "1d") -> 
             
         return data.to_dict("records")
     except Exception:
-        return []
+        return {}
 
-@st.cache_data(ttl=3600) # Cache news for 1 hour
-def get_stock_news(ticker: str) -> List[Dict[str, Any]]:
+def get_stock_news(ticker):
     """Fetches recent news for a stock directly from yfinance."""
     try:
         stock = yf.Ticker(ticker)
@@ -128,3 +146,4 @@ def get_stock_news(ticker: str) -> List[Dict[str, Any]]:
         return recent_news
     except Exception:
         return []
+
