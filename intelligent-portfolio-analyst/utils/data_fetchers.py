@@ -1,12 +1,13 @@
+import streamlit as st
 import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
-import requests
+from typing import Dict, Any, List
 
-# NOTE: The fetch_all_nse_tickers function has been removed from this file.
-# The application now uses a large, reliable, static list from stock_universe.py
+# --- Caching ensures we don't re-fetch the same data repeatedly ---
 
-def get_stock_name(ticker):
+@st.cache_data(ttl=3600)  # Cache for 1 hour
+def get_stock_name(ticker: str) -> str:
     """Fetches the long name of a stock from its ticker."""
     try:
         stock = yf.Ticker(ticker)
@@ -14,8 +15,9 @@ def get_stock_name(ticker):
     except Exception:
         return ticker
 
-def get_beta(ticker):
-    """Fetches the beta of a stock."""
+@st.cache_data(ttl=3600)
+def get_beta(ticker: str) -> float:
+    """Fetches the beta of a stock, defaulting to 1.0 on failure."""
     try:
         stock = yf.Ticker(ticker)
         beta = stock.info.get('beta')
@@ -23,40 +25,39 @@ def get_beta(ticker):
     except Exception:
         return 1.0
 
-def get_fundamental_data(ticker):
+@st.cache_data(ttl=900) # Cache fundamental data for 15 minutes
+def get_fundamental_data(ticker: str) -> Dict[str, Any]:
     """
-    Fetches an expanded set of fundamental data, including the new
-    metrics required for the Peter Lynch analysis.
+    Fetches an expanded set of raw fundamental data for a stock.
+    Formatting is handled by the UI layer.
     """
     try:
         stock = yf.Ticker(ticker)
         info = stock.info
         
-        pe_ratio = info.get('trailingPE')
-        eps = info.get('trailingEps')
-        pb_ratio = info.get('priceToBook')
-        debt_to_equity = info.get('debtToEquity')
-        market_cap = info.get('marketCap')
-        sector = info.get('sector')
-        
-        forward_pe = info.get('forwardPE')
-        peg_ratio = info.get('pegRatio')
-
         return {
-            "P/E Ratio": round(pe_ratio, 2) if pe_ratio else 'N/A',
-            "Forward P/E Ratio": round(forward_pe, 2) if forward_pe else 'N/A',
-            "PEG Ratio": round(peg_ratio, 2) if peg_ratio else 'N/A',
-            "EPS": round(eps, 2) if eps else 'N/A',
-            "Price-to-Book": round(pb_ratio, 2) if pb_ratio else 'N/A',
-            "Debt-to-Equity": round(debt_to_equity / 100, 2) if debt_to_equity else 'N/A',
-            "Market Cap": f"Rs.{market_cap:,.0f}" if market_cap else 'N/A',
-            "sector": sector or 'N/A'
+            "P/E Ratio": info.get('trailingPE'),
+            "Forward P/E Ratio": info.get('forwardPE'),
+            "PEG Ratio": info.get('pegRatio'),
+            "EPS": info.get('trailingEps'),
+            "Price-to-Book": info.get('priceToBook'),
+            "Debt-to-Equity": info.get('debtToEquity'),
+            "Market Cap": info.get('marketCap'),
+            "sector": info.get('sector'),
+            "Current Price": info.get('regularMarketPrice') or info.get('currentPrice'),
+            "High / Low": (info.get('fiftyTwoWeekHigh'), info.get('fiftyTwoWeekLow')),
+            "Book Value": info.get('bookValue'),
+            "Dividend Yield": info.get('dividendYield'),
+            "ROE": info.get('returnOnEquity'),
+            "ROCE": info.get('returnOnAssets'), # Using ROA as a proxy for ROCE
+            "Face Value": info.get('faceValue')
         }
     except Exception:
         return {}
 
-def get_technical_data(ticker):
-    """Fetches key technical indicators for a stock."""
+@st.cache_data(ttl=900) # Cache technical data for 15 minutes
+def get_technical_data(ticker: str) -> Dict[str, Any]:
+    """Fetches key raw technical indicators for a stock."""
     try:
         data = yf.download(ticker, period="1y", interval="1d", auto_adjust=True, progress=False)
         if data.empty:
@@ -75,29 +76,37 @@ def get_technical_data(ticker):
         rsi = 100 - (100 / (1 + rs)).iloc[-1]
 
         return {
-            "50-Day MA": f"Rs.{fifty_day_ma:,.2f}",
-            "200-Day MA": f"Rs.{two_hundred_day_ma:,.2f}",
-            "RSI (14)": f"{rsi:.2f}"
+            "50-Day MA": fifty_day_ma,
+            "200-Day MA": two_hundred_day_ma,
+            "RSI (14)": rsi
         }
     except Exception:
         return {}
 
-def get_price_history(ticker, period="5y"):
-    """Fetches historical price data for a stock."""
+@st.cache_data(ttl=900) # Cache price history for 15 minutes
+def get_price_history(ticker: str, period: str = "5y", interval: str = "1d") -> List[Dict[str, Any]]:
+    """Fetches historical price data for a stock and calculates MAs."""
     try:
-        data = yf.download(ticker, period=period, auto_adjust=True, progress=False)
+        data = yf.download(ticker, period=period, interval=interval, auto_adjust=True, progress=False)
         if data.empty:
-            return {}
+            return []
 
         if isinstance(data.columns, pd.MultiIndex):
             data.columns = data.columns.droplevel(1)
 
+        data['50-Day MA'] = data['Close'].rolling(window=50).mean()
+        data['200-Day MA'] = data['Close'].rolling(window=200).mean()
+        
         data.reset_index(inplace=True)
+        if 'Datetime' in data.columns:
+            data.rename(columns={'Datetime': 'Date'}, inplace=True)
+            
         return data.to_dict("records")
     except Exception:
-        return {}
+        return []
 
-def get_stock_news(ticker):
+@st.cache_data(ttl=3600) # Cache news for 1 hour
+def get_stock_news(ticker: str) -> List[Dict[str, Any]]:
     """Fetches recent news for a stock directly from yfinance."""
     try:
         stock = yf.Ticker(ticker)
@@ -119,4 +128,3 @@ def get_stock_news(ticker):
         return recent_news
     except Exception:
         return []
-

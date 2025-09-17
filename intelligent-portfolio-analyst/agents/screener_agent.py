@@ -1,88 +1,88 @@
 import os
+import re
+import json
+import streamlit as st
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
-import json
-import re
-import streamlit as st
+from typing import Dict, Any
 from utils import data_fetchers
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
-def analyze_screener_stock(ticker, risk_appetite, horizon):
+# --- AGENT CONFIGURATION ---
+
+# Define the prompt as a constant for better readability and maintenance
+PROS_CONS_PROMPT_TEMPLATE = (
+    "You are a senior stock analyst reviewing financial data for '{stock_name}'. "
+    "Based on the following metrics: {fundamentals}, generate a balanced list of potential pros and cons for an investor. "
+    "Focus on objective facts from the data. Provide 3 pros and 3 cons. "
+    "Return ONLY a raw JSON object with two keys: 'pros' and 'cons'. Both keys should hold a list of concise, single-sentence strings."
+)
+
+# Initialize the LLM client once to improve performance
+LLM = ChatGroq(
+    model_name="meta-llama/llama-4-scout-17b-16e-instruct",
+    groq_api_key=os.getenv("GROQ_API_KEY"),
+    temperature=0.1
+)
+
+PROMPT = ChatPromptTemplate.from_template(PROS_CONS_PROMPT_TEMPLATE)
+CHAIN = PROMPT | LLM
+
+# --- HELPER FUNCTION ---
+
+def extract_json_from_response(response_text: str) -> Dict[str, Any]:
+    """A robust function to find and extract a JSON object from a string."""
+    # This pattern is more robust as it captures JSON within markdown code blocks
+    match = re.search(r'```json\s*(\{.*?\})\s*```', response_text, re.DOTALL)
+    if match:
+        return json.loads(match.group(1))
+    
+    # Fallback for raw JSON objects
+    match = re.search(r'(\{.*?\})', response_text, re.DOTALL)
+    if match:
+        return json.loads(match.group(1))
+        
+    raise ValueError("No valid JSON object found in the LLM response.")
+
+# --- MAIN AGENT FUNCTION ---
+
+def run_detailed_stock_analysis(ticker: str) -> Dict[str, Any]:
     """
-    Analyzes a single stock against user-defined criteria.
-    Returns a dictionary with the recommendation if it's a match, otherwise None.
+    Runs a detailed, multi-faceted analysis on a single stock ticker,
+    including an AI-driven "pros and cons" summary.
     """
+    st.session_state.analysis_logs.append(f"--- Running detailed analysis for {ticker} ---")
+
     try:
-        # 1. Fetch Key Data
         formatted_ticker = f"{ticker.strip().upper()}.NS"
-        beta = data_fetchers.get_beta(formatted_ticker)
+        stock_name = data_fetchers.get_stock_name(formatted_ticker)
         fundamentals = data_fetchers.get_fundamental_data(formatted_ticker)
 
-        # 2. Fast Pre-filtering based on Risk Appetite and Beta
-        is_risk_match = False
-        if risk_appetite == "Conservative" and beta < 1.0:
-            is_risk_match = True
-        elif risk_appetite == "Moderate" and 0.8 <= beta <= 1.2:
-            is_risk_match = True
-        elif risk_appetite == "Aggressive" and beta > 1.0:
-            is_risk_match = True
-        
-        if not is_risk_match:
-            return None
+        if not fundamentals:
+            st.session_state.analysis_logs.append(f"Could not fetch fundamental data for {ticker}.")
+            raise ValueError(f"Data fetching failed for {ticker}")
 
-        # 3. AI-Powered Final Verdict for stocks that pass the filter
-        llm = ChatGroq(
-            model_name="meta-llama/llama-4-scout-17b-16e-instruct",
-            groq_api_key=os.getenv("GROQ_API_KEY"),
-            temperature=0.0
-        )
-        prompt = ChatPromptTemplate.from_template(
-            "You are a professional investment advisor. A client has a '{horizon}' investment horizon "
-            "and a '{risk_appetite}' risk appetite. Based on the following data for the stock '{ticker}', "
-            "would you recommend it to them? Data: Beta={beta}, Fundamentals={fundamentals}. "
-            "Return ONLY a raw JSON object with two keys: 'match' ('Yes' or 'No') and 'reason' (a concise justification)."
-        )
-        chain = prompt | llm
-        response = chain.invoke({
-            "horizon": horizon,
-            "risk_appetite": risk_appetite,
-            "ticker": ticker,
-            "beta": beta,
-            "fundamentals": fundamentals
+        response = CHAIN.invoke({
+            "stock_name": stock_name,
+            "fundamentals": json.dumps(fundamentals)
         })
 
-        # 4. Parse the response and return if it's a match
-        match_json = json.loads(response.content)
-        if match_json.get('match') == 'Yes':
-            return {
-                "Symbol": ticker,
-                "Reason": match_json.get('reason', 'N/A'),
-                "Beta": beta,
-                "P/E Ratio": fundamentals.get("P/E Ratio", "N/A")
-            }
+        pros_cons = extract_json_from_response(response.content)
+
+        analysis_result = {
+            "name": stock_name,
+            "fundamentals": fundamentals,
+            "pros_cons": pros_cons
+        }
         
-        return None
+        st.session_state.analysis_logs.append(f"--- Detailed analysis for {ticker} complete ---")
+        return analysis_result
 
-    except Exception:
-        return None
-
-
-def run_screener(tickers, risk_appetite, horizon):
-    """
-    Runs the personalized stock screener on a user-provided list of tickers.
-    """
-    st.session_state.analysis_logs.append("---STARTING PERSONALIZED STOCK SCREENER---")
-    
-    recommendations = []
-    
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        future_to_ticker = {executor.submit(analyze_screener_stock, ticker, risk_appetite, horizon): ticker for ticker in tickers}
-        
-        for future in as_completed(future_to_ticker):
-            result = future.result()
-            if result:
-                recommendations.append(result)
-
-    st.session_state.analysis_logs.append("---STOCK SCREENER COMPLETE---")
-    return recommendations
+    except Exception as e:
+        st.session_state.analysis_logs.append(f"ERROR in detailed analysis for {ticker}: {e}")
+        # Return a consistent structure on failure
+        return {
+            "name": ticker,
+            "fundamentals": {},
+            "pros_cons": {"pros": ["Analysis failed."], "cons": ["Could not generate AI insights."]}
+        }
 
