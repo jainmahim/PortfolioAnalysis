@@ -65,7 +65,7 @@ def stock_analysis_agent(state):
             # 2. Chain of Thought AI Analysis
             llm = ChatGroq(
                 model_name="meta-llama/llama-4-scout-17b-16e-instruct", 
-                groq_api_key=os.getenv("GROQ_API_KEY"),
+                groq_api_key=st.secrets["GROQ_API_KEY"],
                 temperature=0.0
             )
 
@@ -79,10 +79,9 @@ def stock_analysis_agent(state):
 
             # Step 3: Final Synthesis
             synthesis_prompt = ChatPromptTemplate.from_template(
-                "You are a very Senior Analyst. Synthesize the data below."
+                "You are a Senior Analyst. Synthesize the data below. "
                 "Data: Fundamental Verdict: {fundamental_verdict}, Technical Verdict: {technical_verdict}, Beta: {beta}. "
-                "And based on this and other analyst recommendations on web, provide a final investment recommendation as one of Buy, Hold, or Sell and its urgency (High, Medium, Low). "
-                "Return ONLY a raw JSON with keys 'recommendation', 'urgency', and 'reason'.  The 'reason' should be a very concise (only direct reasons nothing extra words), single sentence summarizing the key driver for the recommendation."
+                "Return ONLY a raw JSON with keys 'recommendation', 'urgency', and a 'reason' that is a concise, single sentence."
             )
             synthesis_chain = synthesis_prompt | llm
             final_response = synthesis_chain.invoke({
@@ -118,3 +117,4 @@ def stock_analysis_agent(state):
         "stock_analysis_results": enriched_stock_results,
         "analysis_errors": analysis_errors
     }
+
