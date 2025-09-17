@@ -106,7 +106,7 @@ def display_stock_deep_dive(data):
 
     st.subheader("🧪 Deep-Dive Analysis")
     for stock in stocks:
-        with st.expander(f"Explore the tea on {stock.get('name', 'N/A')}"):
+        with st.expander(f"View Full Analysis for {stock.get('name', 'N/A')}"):
             st.subheader(f"{stock.get('name', 'N/A')} ({stock.get('ticker', 'N/A')})")
             
             st.markdown("#### Key Metrics (Peter Lynch Style)")
@@ -169,7 +169,7 @@ def display_news_feed(data):
             with st.container(border=True):
                 st.write(f"**{article.get('title', 'No Title')}**")
                 st.write(f"*{article.get('publisher', 'N/A')} | {article.get('publish_date', 'N/A')}*")
-                st.info(f"**AI TL;DR:** {article.get('summary', 'Not available.')}")
+                st.info(f"**AI Summary:** {article.get('summary', 'Not available.')}")
                 st.link_button("Read the Full Story", article.get('link', '#'))
 
 
@@ -249,7 +249,7 @@ def display_what_if_analysis(original_stocks):
 
 def display_screener():
     """ Displays the completely revamped Detailed Stock Analysis tab. """
-    st.header("🔍 Get the Lowdown on Any Stock")
+    st.header("🔍 Get detailed analysis on any Stock")
     st.write("Your personal stock research assistant. Let's dig in.")
 
     with st.form("stock_selection_form"):
@@ -419,7 +419,7 @@ def main():
     
     with st.sidebar:
         st.header("Portfolio Upload")
-        st.write("Upload your statement (CSV or XLSX) to get started.")
+        st.write("Upload your ZERODHA holdings (CSV or XLSX) to get started.")
         uploaded_file = st.file_uploader("Drag and drop file here", type=["csv", "xlsx"], label_visibility="collapsed")
 
     if 'final_report' not in st.session_state:
@@ -498,7 +498,7 @@ def main():
         with col2:
             st.subheader("Analysis Logs")
             log_text = "\n".join(st.session_state.get('analysis_logs', []))
-            st.text_area("Logs", log_text, height=150, key="footer_logs")
+            st.text_area("Logs", log_text, height=195, key="footer_logs",label_visibility="collapsed")
 
     st.warning("""**Disclaimer:** Investment in securities market are subject to market risks. Read all related documents carefully before investing. This is AI-generated content for educational purposes only. AI can make mistakes. All financial data is provided by yfinance.""", icon="⚠️")
 

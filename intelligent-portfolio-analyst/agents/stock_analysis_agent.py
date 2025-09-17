@@ -79,9 +79,10 @@ def stock_analysis_agent(state):
 
             # Step 3: Final Synthesis
             synthesis_prompt = ChatPromptTemplate.from_template(
-                "You are a Senior Analyst. Synthesize the data below. "
+                "You are a very Senior Analyst. Synthesize the data below."
                 "Data: Fundamental Verdict: {fundamental_verdict}, Technical Verdict: {technical_verdict}, Beta: {beta}. "
-                "Return ONLY a raw JSON with keys 'recommendation', 'urgency', and 'reason'."
+                "And based on this and other analyst recommendations on web, provide a final investment recommendation as one of Buy, Hold, or Sell and its urgency (High, Medium, Low). "
+                "Return ONLY a raw JSON with keys 'recommendation', 'urgency', and 'reason'.  The 'reason' should be a very concise (only direct reasons nothing extra words), single sentence summarizing the key driver for the recommendation."
             )
             synthesis_chain = synthesis_prompt | llm
             final_response = synthesis_chain.invoke({
@@ -117,4 +118,3 @@ def stock_analysis_agent(state):
         "stock_analysis_results": enriched_stock_results,
         "analysis_errors": analysis_errors
     }
-
