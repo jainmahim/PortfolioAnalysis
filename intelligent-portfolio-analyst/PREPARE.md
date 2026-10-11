@@ -438,10 +438,13 @@ plans its own next action. True agentic systems would let the model choose tools
 dynamically, which this doesn't do."
 
 **Q: What's a real production risk in this design?**
-A: "The Groq LLM calls have no retry/backoff, so a rate-limit error on stock #30 of 50 just logs an
-error and moves on — the user silently gets a partial report. In production I'd want retry with
-exponential backoff, and probably a queue/batching system rather than one request per stock inline
-in a web request."
+A: "Each Groq LLM call goes through `invoke_with_retry()`, which retries transient failures — rate
+limits, timeouts, connection errors, 5xx — with exponential backoff, up to 3 attempts. That handles
+short-lived blips, but it doesn't solve sustained rate-limit exhaustion: a 50-stock portfolio is 150
+sequential LLM calls, and if you genuinely exceed your per-minute quota for an extended period, those
+retries will eventually give up too, and that stock just gets logged as a failure while the rest of
+the portfolio continues. In production I'd want a queue/batching system instead of one request per
+stock inline in a single web request, so a big portfolio doesn't hold the request open that long."
 
 ---
 
@@ -486,8 +489,11 @@ analysis — so one bad AI response never takes down the whole portfolio report.
 - **Screener tab**: standalone, not part of the graph — one function, one LLM call.
 - **Tests**: `pytest` + `pytest-mock`, `FakeLLM` double standing in for `ChatGroq`, mocked
   `data_fetchers` — fully offline, no real API keys needed.
-- **Known gaps I can speak to**: no LLM retry/backoff, PDF parser is a per-broker template, static
-  ticker list needs manual refresh.
+- **Retry/backoff**: `utils/llm_retry.invoke_with_retry()` wraps every Groq `.invoke()` call, retrying
+  rate-limit/timeout/connection/5xx errors with exponential backoff (2s, 4s, 8s) for up to 3 attempts.
+- **Known gaps I can speak to**: PDF parser is a per-broker template, static ticker list needs manual
+  refresh, retry/backoff helps transient failures but not sustained rate-limit exhaustion on very
+  large portfolios.
 - **One-liner if your mind goes blank**: "It's a multi-agent LangGraph pipeline that turns a raw
   portfolio file into an AI-analyzed investment dashboard, one stock at a time."
 
@@ -497,7 +503,7 @@ analysis — so one bad AI response never takes down the whole portfolio report.
 
 **One-line summary (for a project list):**
 "AI-powered portfolio analysis platform using a multi-agent LangGraph pipeline (Streamlit + Groq LLM
-+ yfinance) with concurrent data fetching, defensive parsing, and a 77-test pytest suite."
++ yfinance) with concurrent data fetching, retry/backoff resilience, and an 82-test pytest suite."
 
 **Resume bullets (pick 3-4 depending on space):**
 
@@ -511,8 +517,9 @@ analysis — so one bad AI response never takes down the whole portfolio report.
   live market data fetched via `yfinance`, with a hybrid news pipeline (yfinance primary, NewsAPI
   fallback) for resilience against rate limits.
 - Optimized per-stock data enrichment with a `ThreadPoolExecutor`, parallelizing I/O-bound
-  market-data calls while keeping LLM calls sequential to respect API rate limits.
-- Wrote a 77-test **pytest** suite (parsers, agents, utils) using mocked LLM/API clients, enabling
+  market-data calls while keeping LLM calls sequential, with exponential-backoff retry on
+  transient Groq failures (rate limits, timeouts, 5xx) to respect API rate limits.
+- Wrote an 82-test **pytest** suite (parsers, agents, utils) using mocked LLM/API clients, enabling
   fully offline, deterministic CI without real API keys.
 - Hardened file-ingestion parsers (CSV/XLSX/PDF) against malformed input and silent failure modes
   (e.g., fixed a crash on scanned/image-only PDF pages).
