@@ -5,6 +5,8 @@ import json
 import re
 import streamlit as st
 from utils import data_fetchers
+from utils.config import get_secret
+from utils.llm_retry import invoke_with_retry
 
 def run_detailed_stock_analysis(ticker):
     """
@@ -22,7 +24,7 @@ def run_detailed_stock_analysis(ticker):
         # 2. AI-Powered Pros and Cons Generation
         llm = ChatGroq(
             model_name="meta-llama/llama-4-scout-17b-16e-instruct",
-            groq_api_key=st.secrets["GROQ_API_KEY"],
+            groq_api_key=get_secret("GROQ_API_KEY"),
             temperature=0.1
         )
         
@@ -36,10 +38,11 @@ def run_detailed_stock_analysis(ticker):
         prompt = ChatPromptTemplate.from_template(prompt_template)
         chain = prompt | llm
         
-        response = chain.invoke({
-            "stock_name": stock_name,
-            "fundamentals": json.dumps(fundamentals)
-        })
+        response = invoke_with_retry(
+            chain,
+            {"stock_name": stock_name, "fundamentals": json.dumps(fundamentals)},
+            logger=st.session_state.analysis_logs.append
+        )
 
         # Safely parse the AI response
         def extract_json_from_response(response_text):

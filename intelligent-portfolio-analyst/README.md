@@ -124,3 +124,17 @@ streamlit run main_app.py
 
 
 Your web browser will automatically open a new tab with the application running.
+
+## Running Tests
+
+The project has an offline, deterministic `pytest` suite under `tests/` covering the parsers, agents,
+and utils. It mocks all `yfinance` and `ChatGroq` network calls, so it runs without any real API keys.
+
+Install the extra test dependencies and run it with:
+
+
+pip install -r requirements-dev.txt
+pytest
+
+
+See `AGENTS.md` for more detail on the testing conventions used in this repo.

@@ -1,16 +1,41 @@
 import os
+from concurrent.futures import ThreadPoolExecutor
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 import json
 import re
 import streamlit as st
 from utils import data_fetchers
+from utils.config import get_secret
+from utils.llm_retry import invoke_with_retry
+
+def fetch_stock_data(formatted_ticker):
+    """
+    Fetches all live market data for one ticker. The four yfinance calls are
+    independent I/O-bound requests, so they run concurrently in a small thread
+    pool instead of one after another; this only speeds up data gathering, the
+    LLM calls stay sequential per stock to avoid hitting Groq rate limits.
+    """
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        name_future = executor.submit(data_fetchers.get_stock_name, formatted_ticker)
+        fundamentals_future = executor.submit(data_fetchers.get_fundamental_data, formatted_ticker)
+        technicals_future = executor.submit(data_fetchers.get_technical_data, formatted_ticker)
+        price_history_future = executor.submit(data_fetchers.get_price_history, formatted_ticker)
+        beta_future = executor.submit(data_fetchers.get_beta, formatted_ticker)
+
+        return {
+            "stock_name": name_future.result(),
+            "fundamentals": fundamentals_future.result(),
+            "technicals": technicals_future.result(),
+            "price_history": price_history_future.result(),
+            "beta": beta_future.result(),
+        }
 
 def get_llm_response(llm, prompt_template, **kwargs):
     """A helper function to get a response from the LLM with flexible inputs."""
     prompt = ChatPromptTemplate.from_template(prompt_template)
     chain = prompt | llm
-    response = chain.invoke(kwargs)
+    response = invoke_with_retry(chain, kwargs, logger=st.session_state.analysis_logs.append)
     return response.content.strip()
 
 def extract_json_from_response(response_text):
@@ -27,6 +52,8 @@ def stock_analysis_agent(state):
     """
     Performs a robust, sequential, "Chain of Thought" analysis for each stock,
     mirroring a human analyst's workflow for maximum reliability and insight.
+    Per-stock live data (yfinance) is fetched concurrently via fetch_stock_data();
+    the LLM calls remain sequential per stock to stay within Groq rate limits.
     """
     if not isinstance(state, dict):
         error_msg = f"CRITICAL Error: Agent received corrupt data (type: {type(state)})."
@@ -51,13 +78,14 @@ def stock_analysis_agent(state):
         st.session_state.analysis_logs.append(f"Analyzing {formatted_ticker}...")
         
         try:
-            # 1. Data Gathering (now includes Peter Lynch metrics)
-            stock_name = data_fetchers.get_stock_name(formatted_ticker)
-            fundamentals = data_fetchers.get_fundamental_data(formatted_ticker)
-            technicals = data_fetchers.get_technical_data(formatted_ticker)
-            price_history = data_fetchers.get_price_history(formatted_ticker)
-            beta = data_fetchers.get_beta(formatted_ticker)
-            
+            # 1. Data Gathering (now includes Peter Lynch metrics), fetched concurrently
+            fetched = fetch_stock_data(formatted_ticker)
+            stock_name = fetched["stock_name"]
+            fundamentals = fetched["fundamentals"]
+            technicals = fetched["technicals"]
+            price_history = fetched["price_history"]
+            beta = fetched["beta"]
+
             # Circuit Breaker: If live data fails, stop analysis for this stock
             if not fundamentals or not technicals or not price_history:
                 raise ValueError("Live market data could not be retrieved from the provider.")
@@ -65,7 +93,7 @@ def stock_analysis_agent(state):
             # 2. Chain of Thought AI Analysis
             llm = ChatGroq(
                 model_name="meta-llama/llama-4-scout-17b-16e-instruct", 
-                groq_api_key=st.secrets["GROQ_API_KEY"],
+                groq_api_key=get_secret("GROQ_API_KEY"),
                 temperature=0.0
             )
 
@@ -85,11 +113,15 @@ def stock_analysis_agent(state):
                 "Return ONLY a raw JSON with keys 'recommendation', 'urgency', and 'reason'.  The 'reason' should be a very concise (only direct reasons nothing extra words), single sentence summarizing the key driver for the recommendation."
             )
             synthesis_chain = synthesis_prompt | llm
-            final_response = synthesis_chain.invoke({
-                "fundamental_verdict": fundamental_verdict,
-                "technical_verdict": technical_verdict,
-                "beta": beta
-            })
+            final_response = invoke_with_retry(
+                synthesis_chain,
+                {
+                    "fundamental_verdict": fundamental_verdict,
+                    "technical_verdict": technical_verdict,
+                    "beta": beta
+                },
+                logger=st.session_state.analysis_logs.append
+            )
 
             # Safely parse the final JSON response
             try:

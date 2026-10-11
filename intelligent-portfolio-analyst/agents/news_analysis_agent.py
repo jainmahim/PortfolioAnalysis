@@ -5,6 +5,8 @@ from newsapi import NewsApiClient
 import streamlit as st
 from typing import Dict, Any
 from utils import data_fetchers
+from utils.config import get_secret
+from utils.llm_retry import invoke_with_retry
 
 def news_analysis_agent(state: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -27,19 +29,30 @@ def news_analysis_agent(state: Dict[str, Any]) -> Dict[str, Any]:
         return {"news": []}
 
     try:
-        # Initialize clients for both primary and fallback sources
-        newsapi = NewsApiClient(api_key=st.secrets["NEWS_API_KEY"])
+        # LLM summarization is required; abort the whole step if it can't be configured.
         llm = ChatGroq(
             model_name="meta-llama/llama-4-scout-17b-16e-instruct", 
-            groq_api_key=st.secrets["GROQ_API_KEY"],
+            groq_api_key=get_secret("GROQ_API_KEY"),
             temperature=0.0
         )
         summary_prompt = ChatPromptTemplate.from_template(
             "Summarize the following news headline into a single, concise, and insightful sentence: {article_title}"
         )
         summary_chain = summary_prompt | llm
-        
-        news_api_rate_limited = False
+
+        # The NewsAPI fallback is optional: yfinance is the primary source, so a
+        # missing/invalid NEWS_API_KEY should only disable the fallback, not the
+        # whole news step.
+        newsapi = None
+        try:
+            newsapi = NewsApiClient(api_key=get_secret("NEWS_API_KEY"))
+        except Exception as e:
+            fallback_unavailable = f"NewsAPI fallback disabled: {e}"
+            if fallback_unavailable not in analysis_errors:
+                analysis_errors.append(fallback_unavailable)
+                st.session_state.analysis_logs.append(fallback_unavailable)
+
+        news_api_rate_limited = newsapi is None
 
         for stock in stock_results:
             ticker = stock.get('ticker')
@@ -86,7 +99,11 @@ def news_analysis_agent(state: Dict[str, Any]) -> Dict[str, Any]:
                     if not title:
                         continue
                         
-                    article_summary = summary_chain.invoke({"article_title": title}).content
+                    article_summary = invoke_with_retry(
+                        summary_chain,
+                        {"article_title": title},
+                        logger=st.session_state.analysis_logs.append
+                    ).content
                     
                     article['summary'] = article_summary
                     news_for_ticker["articles"].append(article)
